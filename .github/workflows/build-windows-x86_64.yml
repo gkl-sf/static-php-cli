@@ -25,6 +25,9 @@ on:
         description: extensions to compile (comma separated)
         required: true
         type: string
+      extra-libs:
+        description: Extra libraries to build (optional, comma separated)
+        type: string        
       prefer-pre-built:
         description: prefer pre-built binaries (reduce build time)
         type: boolean
@@ -61,7 +64,7 @@ jobs:
       - name: Generate hashed key for download cache
         shell: bash
         run: |
-          INPUT_HASH=$(echo "${{ runner.os }}-${{ inputs.version }}-${{ inputs.extensions }}" | sha256sum | awk '{print $1}')
+          INPUT_HASH=$(echo "${{ runner.os }}-${{ inputs.version }}-${{ inputs.extensions }}-${{ inputs.extra-libs }}" | sha256sum | awk '{print $1}')
           echo "INPUT_HASH=${INPUT_HASH}" >> "$GITHUB_ENV"
 
       # Cache downloaded source
@@ -76,6 +79,10 @@ jobs:
         run: echo "SPC_BUILD_DEBUG=--debug" >> $env:GITHUB_ENV
       - if: inputs.prefer-pre-built == true
         run: echo "SPC_PRE_BUILT=--prefer-pre-built" >> $env:GITHUB_ENV
+      - if: inputs.extra-libs != ''
+        run: |
+          echo "SPC_FOR_LIBS=--for-libs=${{ inputs.extra-libs }}" >> $env:GITHUB_ENV
+          echo "SPC_WITH_LIBS=--with-libs=${{ inputs.extra-libs }}" >> $env:GITHUB_ENV        
       - if: inputs.with-suggested-libs == true
         run: echo "SPC_SUGGESTED_LIBS=--with-suggested-libs" >> $env:GITHUB_ENV
         
@@ -89,10 +96,10 @@ jobs:
 
       # If there's no dependencies cache, fetch sources, with or without debug
       - if: steps.cache-download.outputs.cache-hit != 'true'
-        run: ./bin/spc download --with-php="${{ inputs.version }}" --for-extensions="${{ inputs.extensions }}" ${{ env.SPC_BUILD_DEBUG }} ${{ env.SPC_PRE_BUILT }}
+        run: ./bin/spc download --with-php="${{ inputs.version }}" --for-extensions="${{ inputs.extensions }}" ${{ env.SPC_BUILD_DEBUG }} ${{ env.SPC_PRE_BUILT }} ${{ env.SPC_FOR_LIBS }}
 
       # Run build command
-      - run: ./bin/spc build "${{ inputs.extensions }}" ${{ env.SPC_BUILD_DEBUG }} ${{ env.SPC_BUILD_CLI }} ${{ env.SPC_BUILD_MICRO }} ${{ env.SPC_BUILD_FPM }} ${{ env.SPC_SUGGESTED_LIBS }}
+      - run: ./bin/spc build "${{ inputs.extensions }}" ${{ env.SPC_BUILD_DEBUG }} ${{ env.SPC_BUILD_CLI }} ${{ env.SPC_BUILD_MICRO }} ${{ env.SPC_BUILD_FPM }} ${{ env.SPC_WITH_LIBS }}
 
       # Upload cli executable
       - if: ${{ inputs.build-cli == true }}
